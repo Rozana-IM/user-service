@@ -1,19 +1,39 @@
 const express = require("express");
 const cors = require("cors");
+const db = require("./db");
+
 const app = express();
 const PORT = process.env.PORT || 4000;
-app.use(cors({
-  origin: "https://rozana-projects.online", // replace with your real domain
-}));
+
+// Middleware
+app.use(express.json());
+app.use(
+  cors({
+    origin: process.env.FRONTEND_URL || "https://yourdomain.com",
+  })
+);
+
+// Connect to DB
+db.connect();
+
+// Routes
 app.get("/users", (req, res) => {
-  res.json([
-    { id: 1, name: "Siva" },
-    { id: 2, name: "DevOps User" }
-  ]);
+  db.pool.query("SELECT * FROM users", (err, results) => {
+    if (err) {
+      console.error("❌ Error fetching users:", err.message);
+      return res.status(500).json({ error: "Database error" });
+    }
+
+    res.status(200).json(results);
+  });
 });
+
+// Health Check
 app.get("/health", (req, res) => {
-  res.send("User Service is healthy");
+  res.status(200).send("User Service is healthy");
 });
+
+// Start Server
 app.listen(PORT, "0.0.0.0", () => {
-  console.log(`User Service running on port ${PORT}`);
+  console.log(`✅ User Service running on port ${PORT}`);
 });
