@@ -1,6 +1,7 @@
 const mysql = require("mysql2");
 
-// Create connection pool
+console.log("🔥 DB.JS VERSION 2026-02-12 FIXED");
+
 const pool = mysql.createPool({
   host: process.env.DB_HOST,
   user: process.env.DB_USER,
@@ -12,20 +13,16 @@ const pool = mysql.createPool({
   queueLimit: 0,
 });
 
-// Test DB connection
 const connect = () => {
   pool.getConnection((err, connection) => {
     if (err) {
       console.error("❌ User Service DB connection failed:", err.message);
       return;
     }
-
     console.log("✅ User Service DB connected");
     connection.release();
   });
 };
 
-module.exports = {
-  pool,
-  connect,
-};
+module.exports = { pool, connect };
+
