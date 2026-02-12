@@ -1,28 +1,37 @@
 const express = require("express");
+
+const cors = require("cors");
+ 
 const app = express();
 
 const PORT = process.env.PORT || 4000;
+ 
+app.use(cors({
 
+  origin: "https://rozana-projects.online", // replace with your real domain
+
+}));
+ 
 app.get("/users", (req, res) => {
+
   res.json([
-    { id: 1, name: "Rozana" },
+
+    { id: 1, name: "Siva" },
+
     { id: 2, name: "DevOps User" }
+
   ]);
-});
 
+});
+ 
 app.get("/health", (req, res) => {
+
   res.send("User Service is healthy");
+
 });
+ 
+app.listen(PORT, "0.0.0.0", () => {
 
-app.listen(PORT, () =>
-  console.log(`User Service running on port ${PORT}`)
-);
+  console.log(`User Service running on port ${PORT}`);
 
-db.js:
--------
-module.exports = {
-  connect: () => {
-    console.log("User Service DB connected");
-  }
-};
-
+});
