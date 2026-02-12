@@ -9,7 +9,7 @@ const PORT = process.env.PORT || 4000;
 app.use(express.json());
 app.use(
   cors({
-    origin: process.env.FRONTEND_URL || "https://yourdomain.com",
+    origin: process.env.FRONTEND_URL || "https://rozana-projects.online",
   })
 );
 
