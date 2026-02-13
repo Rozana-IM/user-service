@@ -1,15 +1,14 @@
 pipeline {
-
     agent any
 
     environment {
-        AWS_REGION      = "us-east-1"
-        ECR_REPO        = "user-service"
-        ECS_CLUSTER     = "Dev-cluster"
-        ECS_SERVICE     = "user-service-service-dpdgdmav"
-        IMAGE_TAG       = "${BUILD_NUMBER}"
-        AWS_ACCOUNT_ID  = "249608715148"
-        ECR_URI         = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPO}"
+        AWS_REGION     = "us-east-1"
+        ECR_REPO       = "user-service"
+        ECS_CLUSTER    = "Dev-cluster"
+        ECS_SERVICE    = "user-service-service"
+        IMAGE_TAG      = "${BUILD_NUMBER}"
+        AWS_ACCOUNT_ID = "249608715148"
+        ECR_URI        = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPO}"
     }
 
     stages {
@@ -20,33 +19,21 @@ pipeline {
             }
         }
 
-        stage('Build Docker Image') {
+        stage('Login to ECR') {
+            steps {
+                sh """
+                aws ecr get-login-password --region ${AWS_REGION} | \
+                docker login --username AWS --password-stdin ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com
+                """
+            }
+        }
+
+        stage('Build & Push Image') {
             steps {
                 sh """
                 docker build -t ${ECR_REPO}:${IMAGE_TAG} .
                 docker tag ${ECR_REPO}:${IMAGE_TAG} ${ECR_URI}:${IMAGE_TAG}
                 docker tag ${ECR_REPO}:${IMAGE_TAG} ${ECR_URI}:latest
-                """
-            }
-        }
-
-        stage('Login to ECR') {
-            steps {
-                withCredentials([
-                    string(credentialsId: 'aws-access-key-id', variable: 'AWS_ACCESS_KEY_ID'),
-                    string(credentialsId: 'aws-secret-access-key', variable: 'AWS_SECRET_ACCESS_KEY')
-                ]) {
-                    sh """
-                    aws ecr get-login-password --region ${AWS_REGION} | \
-                    docker login --username AWS --password-stdin ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com
-                    """
-                }
-            }
-        }
-
-        stage('Push to ECR') {
-            steps {
-                sh """
                 docker push ${ECR_URI}:${IMAGE_TAG}
                 docker push ${ECR_URI}:latest
                 """
@@ -57,10 +44,10 @@ pipeline {
             steps {
                 sh """
                 aws ecs update-service \
-                    --cluster ${ECS_CLUSTER} \
-                    --service ${ECS_SERVICE} \
-                    --force-new-deployment \
-                    --region ${AWS_REGION}
+                  --cluster ${ECS_CLUSTER} \
+                  --service ${ECS_SERVICE} \
+                  --force-new-deployment \
+                  --region ${AWS_REGION}
                 """
             }
         }
@@ -68,7 +55,7 @@ pipeline {
 
     post {
         always {
-            sh "docker system prune -f"
+            sh "docker image prune -f"
         }
     }
 }
