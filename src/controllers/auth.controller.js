@@ -2,77 +2,88 @@ const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const db = require("../db");
 
-// REGISTER
+const generateAccessToken = (user) =>
+  jwt.sign(user, process.env.JWT_SECRET, { expiresIn: "15m" });
+
+const generateRefreshToken = (user) =>
+  jwt.sign(user, process.env.JWT_SECRET, { expiresIn: "7d" });
+
+// ================= REGISTER =================
 exports.registerUser = async (req, res) => {
   const { name, email, password } = req.body;
-
-  const hashedPassword = await bcrypt.hash(password, 10);
+  const hashed = await bcrypt.hash(password, 10);
 
   db.pool.query(
-    "INSERT INTO users (name, email, password, role) VALUES (?, ?, ?, 'user')",
-    [name, email, hashedPassword],
+    "INSERT INTO users (name,email,password,role) VALUES (?,?,?, 'user')",
+    [name, email, hashed],
     (err, result) => {
-      if (err) {
-        return res
-          .status(409)
-          .json({ error: "User already exists. Please login." });
-      }
+      if (err) return res.status(409).json({ error: "User exists" });
 
-      const token = jwt.sign(
-        { id: result.insertId, email, role: "user" },
-        process.env.JWT_SECRET,
-        { expiresIn: process.env.JWT_EXPIRES_IN }
+      const payload = { id: result.insertId, email, role: "user" };
+      const token = generateAccessToken(payload);
+      const refreshToken = generateRefreshToken(payload);
+
+      db.pool.query(
+        "UPDATE users SET refresh_token=? WHERE id=?",
+        [refreshToken, result.insertId]
       );
 
-      res.status(201).json({
-        user: { id: result.insertId, name, email, role: "user" },
-        token,
-      });
+      res.json({ user: payload, token, refreshToken });
     }
   );
 };
 
-// LOGIN
-exports.loginUser = async (req, res) => {
+// ================= LOGIN =================
+exports.loginUser = (req, res) => {
   const { email, password } = req.body;
 
   db.pool.query(
-    "SELECT * FROM users WHERE email = ?",
+    "SELECT * FROM users WHERE email=?",
     [email],
-    async (err, results) => {
-      if (results.length === 0) {
-        return res.status(401).json({ error: "Invalid credentials" });
-      }
+    async (err, rows) => {
+      if (!rows.length) return res.status(401).json({ error: "Invalid login" });
 
-      const user = results[0];
+      const user = rows[0];
       const match = await bcrypt.compare(password, user.password);
+      if (!match) return res.status(401).json({ error: "Invalid login" });
 
-      if (!match) {
-        return res.status(401).json({ error: "Invalid credentials" });
-      }
+      const payload = { id: user.id, email, role: user.role };
+      const token = generateAccessToken(payload);
+      const refreshToken = generateRefreshToken(payload);
 
-      const token = jwt.sign(
-        { id: user.id, email: user.email, role: user.role },
-        process.env.JWT_SECRET,
-        { expiresIn: process.env.JWT_EXPIRES_IN }
+      db.pool.query(
+        "UPDATE users SET refresh_token=? WHERE id=?",
+        [refreshToken, user.id]
       );
 
-      res.json({
-        user: {
-          id: user.id,
-          name: user.name,
-          email: user.email,
-          role: user.role,
-        },
-        token,
-      });
+      res.json({ user: payload, token, refreshToken });
     }
   );
 };
 
-// ADMIN – GET USERS
-exports.getAllUsers = (req, res) => {
-  db.pool.query("SELECT id, name, email, role FROM users", (err, results) => {
-    res.json(results);
+// ================= REFRESH =================
+exports.refreshToken = (req, res) => {
+  const { refreshToken } = req.body;
+
+  if (!refreshToken) return res.sendStatus(401);
+
+  jwt.verify(refreshToken, process.env.JWT_SECRET, (err, user) => {
+    if (err) return res.sendStatus(403);
+
+    db.pool.query(
+      "SELECT * FROM users WHERE id=? AND refresh_token=?",
+      [user.id, refreshToken],
+      (err, rows) => {
+        if (!rows.length) return res.sendStatus(403);
+
+        const token = generateAccessToken({
+          id: user.id,
+          email: user.email,
+          role: user.role,
+        });
+
+        res.json({ token });
+      }
+    );
   });
 };
