@@ -14,7 +14,7 @@ app.use(express.json());
 app.use(
   cors({
     origin: process.env.FRONTEND_URL || "https://rozana-projects.online",
-    methods: ["GET", "POST", "PUT", "DELETE"],
+    methods: ["GET", "POST"],
     credentials: true,
   })
 );
@@ -25,7 +25,7 @@ app.use(
 db.connect();
 
 // ======================
-// REGISTER USER
+// REGISTER USER (AUTO LOGIN)
 // ======================
 app.post("/register", async (req, res) => {
   try {
@@ -40,19 +40,25 @@ app.post("/register", async (req, res) => {
     db.pool.query(
       "INSERT INTO users (name, email, password) VALUES (?, ?, ?)",
       [name, email, hashedPassword],
-      (err) => {
+      (err, result) => {
         if (err) {
-          console.error("❌ Register error:", err.message);
           return res
             .status(409)
-            .json({ error: "User already exists or DB error" });
+            .json({ error: "User already exists. Please login." });
         }
 
-        res.status(201).json({ message: "User registered successfully" });
+        // ✅ RETURN USER FOR FRONTEND AUTO LOGIN
+        res.status(201).json({
+          user: {
+            id: result.insertId,
+            name,
+            email,
+          },
+        });
       }
     );
   } catch (error) {
-    console.error("❌ Register exception:", error.message);
+    console.error("❌ Register error:", error.message);
     res.status(500).json({ error: "Server error" });
   }
 });
@@ -78,18 +84,21 @@ app.post("/login", async (req, res) => {
         }
 
         if (results.length === 0) {
-          return res.status(401).json({ error: "User not found" });
+          return res
+            .status(401)
+            .json({ error: "Invalid email or password" });
         }
 
         const user = results[0];
         const match = await bcrypt.compare(password, user.password);
 
         if (!match) {
-          return res.status(401).json({ error: "Invalid credentials" });
+          return res
+            .status(401)
+            .json({ error: "Invalid email or password" });
         }
 
         res.json({
-          message: "Login successful",
           user: {
             id: user.id,
             name: user.name,
@@ -99,22 +108,25 @@ app.post("/login", async (req, res) => {
       }
     );
   } catch (error) {
-    console.error("❌ Login exception:", error.message);
+    console.error("❌ Login error:", error.message);
     res.status(500).json({ error: "Server error" });
   }
 });
 
 // ======================
-// GET USERS
+// ADMIN – GET ALL USERS
 // ======================
-app.get("/users", (req, res) => {
-  db.pool.query("SELECT id, name, email FROM users", (err, results) => {
-    if (err) {
-      console.error("❌ Error fetching users:", err.message);
-      return res.status(500).json({ error: "Database error" });
+app.get("/admin/users", (req, res) => {
+  db.pool.query(
+    "SELECT id, name, email FROM users",
+    (err, results) => {
+      if (err) {
+        console.error("❌ Fetch users error:", err.message);
+        return res.status(500).json({ error: "Database error" });
+      }
+      res.json(results);
     }
-    res.json(results);
-  });
+  );
 });
 
 // ======================
