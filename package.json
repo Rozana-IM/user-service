@@ -1,15 +1,14 @@
 {
   "name": "user-service",
   "version": "1.0.0",
-  "description": "User Service for ECS",
-  "main": "app.js",
+  "main": "src/app.js",
   "scripts": {
-    "start": "node app.js"
+    "start": "node src/app.js"
   },
   "dependencies": {
-  "cors": "^2.8.5",
-  "express": "^4.18.2",
-  "mysql2": "^3.9.0",
-  "bcryptjs": "^2.4.3"
-}
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "express": "^4.18.2",
+    "mysql2": "^3.6.0"
+  }
 }
