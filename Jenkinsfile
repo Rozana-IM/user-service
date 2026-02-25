@@ -33,14 +33,12 @@ pipeline {
                 sh """
                 docker build -t ${ECR_REPO}:${IMAGE_TAG} .
                 docker tag ${ECR_REPO}:${IMAGE_TAG} ${ECR_URI}:${IMAGE_TAG}
-                docker tag ${ECR_REPO}:${IMAGE_TAG} ${ECR_URI}:latest
                 docker push ${ECR_URI}:${IMAGE_TAG}
-                docker push ${ECR_URI}:latest
                 """
             }
         }
 
-        stage('Deploy to ECS') {
+        stage('Deploy to ECS (NEW IMAGE)') {
             steps {
                 sh """
                 aws ecs update-service \
