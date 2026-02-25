@@ -2,6 +2,7 @@ const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const db = require("../db");
 
+// ================= TOKEN HELPERS =================
 const generateAccessToken = (user) =>
   jwt.sign(user, process.env.JWT_SECRET, { expiresIn: "15m" });
 
@@ -11,24 +12,37 @@ const generateRefreshToken = (user) =>
 // ================= REGISTER =================
 exports.registerUser = async (req, res) => {
   const { name, email, password } = req.body;
-  const hashed = await bcrypt.hash(password, 10);
+
+  const hashedPassword = await bcrypt.hash(password, 10);
 
   db.pool.query(
-    "INSERT INTO users (name,email,password,role) VALUES (?,?,?, 'user')",
-    [name, email, hashed],
+    "INSERT INTO users (name, email, password, role) VALUES (?, ?, ?, 'user')",
+    [name, email, hashedPassword],
     (err, result) => {
-      if (err) return res.status(409).json({ error: "User exists" });
+      if (err) {
+        return res.status(409).json({ error: "User already exists" });
+      }
 
-      const payload = { id: result.insertId, email, role: "user" };
-      const token = generateAccessToken(payload);
-      const refreshToken = generateRefreshToken(payload);
+      const user = {
+        id: result.insertId,
+        name,
+        email,
+        role: "user",
+      };
+
+      const token = generateAccessToken(user);
+      const refreshToken = generateRefreshToken(user);
 
       db.pool.query(
         "UPDATE users SET refresh_token=? WHERE id=?",
-        [refreshToken, result.insertId]
+        [refreshToken, user.id]
       );
 
-      res.json({ user: payload, token, refreshToken });
+      res.json({
+        user,
+        token,
+        refreshToken,
+      });
     }
   );
 };
@@ -38,51 +52,73 @@ exports.loginUser = (req, res) => {
   const { email, password } = req.body;
 
   db.pool.query(
-    "SELECT * FROM users WHERE email=?",
+    "SELECT * FROM users WHERE email = ?",
     [email],
-    async (err, rows) => {
-      if (!rows.length) return res.status(401).json({ error: "Invalid login" });
+    async (err, results) => {
+      if (err || results.length === 0) {
+        return res.status(401).json({ error: "Invalid credentials" });
+      }
 
-      const user = rows[0];
-      const match = await bcrypt.compare(password, user.password);
-      if (!match) return res.status(401).json({ error: "Invalid login" });
+      const dbUser = results[0];
+      const match = await bcrypt.compare(password, dbUser.password);
 
-      const payload = { id: user.id, email, role: user.role };
-      const token = generateAccessToken(payload);
-      const refreshToken = generateRefreshToken(payload);
+      if (!match) {
+        return res.status(401).json({ error: "Invalid credentials" });
+      }
+
+      const user = {
+        id: dbUser.id,
+        name: dbUser.name,
+        email: dbUser.email,
+        role: dbUser.role, // ✅ THIS WAS MISSING
+      };
+
+      const token = generateAccessToken(user);
+      const refreshToken = generateRefreshToken(user);
 
       db.pool.query(
         "UPDATE users SET refresh_token=? WHERE id=?",
         [refreshToken, user.id]
       );
 
-      res.json({ user: payload, token, refreshToken });
+      res.json({
+        user,        // ✅ role now sent to frontend
+        token,
+        refreshToken,
+      });
     }
   );
 };
 
-// ================= REFRESH =================
+// ================= REFRESH TOKEN =================
 exports.refreshToken = (req, res) => {
   const { refreshToken } = req.body;
 
   if (!refreshToken) return res.sendStatus(401);
 
-  jwt.verify(refreshToken, process.env.JWT_SECRET, (err, user) => {
+  jwt.verify(refreshToken, process.env.JWT_SECRET, (err, decoded) => {
     if (err) return res.sendStatus(403);
 
     db.pool.query(
       "SELECT * FROM users WHERE id=? AND refresh_token=?",
-      [user.id, refreshToken],
-      (err, rows) => {
-        if (!rows.length) return res.sendStatus(403);
+      [decoded.id, refreshToken],
+      (err, results) => {
+        if (err || results.length === 0) {
+          return res.sendStatus(403);
+        }
 
-        const token = generateAccessToken({
-          id: user.id,
-          email: user.email,
-          role: user.role,
-        });
+        const dbUser = results[0];
 
-        res.json({ token });
+        const user = {
+          id: dbUser.id,
+          name: dbUser.name,
+          email: dbUser.email,
+          role: dbUser.role,
+        };
+
+        const newToken = generateAccessToken(user);
+
+        res.json({ token: newToken });
       }
     );
   });
