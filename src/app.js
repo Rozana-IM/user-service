@@ -1,6 +1,8 @@
 const express = require("express");
 const cors = require("cors");
 const db = require("./db");
+
+// 👉 IMPORT ROUTES EXPLICITLY
 const authRoutes = require("./routes/auth.routes");
 
 const app = express();
@@ -21,7 +23,8 @@ app.use(
 db.connect();
 
 // ================= Routes =================
-app.use(authRoutes);
+// 🔥 IMPORTANT: mount at ROOT
+app.use("/", authRoutes);
 
 // ================= Health =================
 app.get("/health", (req, res) => {
