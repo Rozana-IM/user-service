@@ -16,45 +16,50 @@ pipeline {
 
     stages {
 
+        // ================= CHECKOUT =================
         stage('Checkout') {
             steps {
                 checkout scm
             }
         }
 
+        // ================= LOGIN ECR =================
         stage('Login to ECR') {
             steps {
                 sh '''
                 aws ecr get-login-password --region $AWS_REGION | \
-                docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
+                docker login --username AWS \
+                --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
                 '''
             }
         }
 
+        // ================= BUILD IMAGE =================
         stage('Build & Push Image') {
-    steps {
-        sh """
-        echo "Building Docker image..."
+            steps {
+                sh '''
+                echo "Building Docker image..."
 
-        docker build -t ${ECR_REPO}:${IMAGE_TAG} .
+                docker build -t $ECR_REPO:$IMAGE_TAG .
 
-        echo "Tagging images..."
+                docker tag $ECR_REPO:$IMAGE_TAG $ECR_URI:$IMAGE_TAG
+                docker tag $ECR_REPO:$IMAGE_TAG $ECR_URI:latest
 
-        docker tag ${ECR_REPO}:${IMAGE_TAG} ${ECR_URI}:${IMAGE_TAG}
-        docker tag ${ECR_REPO}:${IMAGE_TAG} ${ECR_URI}:latest
+                echo "Pushing build image..."
+                docker push $ECR_URI:$IMAGE_TAG
 
-        echo "Pushing BUILD_NUMBER image..."
-        docker push ${ECR_URI}:${IMAGE_TAG}
+                echo "Updating latest tag..."
+                docker push $ECR_URI:latest
+                '''
+            }
+        }
 
-        echo "Pushing latest image..."
-        docker push ${ECR_URI}:latest
-        """
-    }
-}
-
+        // ================= REGISTER TASK REVISION =================
         stage('Register NEW Task Definition') {
             steps {
                 sh '''
+                echo "Creating new ECS task revision..."
+
                 aws ecs describe-task-definition \
                   --task-definition $TASK_FAMILY \
                   --region $AWS_REGION \
@@ -73,18 +78,21 @@ pipeline {
 
                 aws ecs register-task-definition \
                   --region $AWS_REGION \
-                  --cli-input-json file://new-task-def.json
+                  --cli-input-json file://new-task-def.json \
+                  > task-output.json
+
+                jq -r '.taskDefinition.revision' task-output.json > revision.txt
                 '''
             }
         }
 
+        // ================= DEPLOY EXACT REVISION =================
         stage('Deploy EXACT Revision to ECS') {
             steps {
                 sh '''
-                REVISION=$(aws ecs describe-task-definition \
-                  --task-definition $TASK_FAMILY \
-                  --region $AWS_REGION \
-                  | jq -r '.taskDefinition.revision')
+                REVISION=$(cat revision.txt)
+
+                echo "Deploying revision: $REVISION"
 
                 aws ecs update-service \
                   --cluster $ECS_CLUSTER \
