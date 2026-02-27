@@ -32,14 +32,25 @@ pipeline {
         }
 
         stage('Build & Push Image') {
-            steps {
-                sh '''
-                docker build -t $ECR_REPO:$IMAGE_TAG .
-                docker tag $ECR_REPO:$IMAGE_TAG $ECR_URI:$IMAGE_TAG
-                docker push $ECR_URI:$IMAGE_TAG
-                '''
-            }
-        }
+    steps {
+        sh """
+        echo "Building Docker image..."
+
+        docker build -t ${ECR_REPO}:${IMAGE_TAG} .
+
+        echo "Tagging images..."
+
+        docker tag ${ECR_REPO}:${IMAGE_TAG} ${ECR_URI}:${IMAGE_TAG}
+        docker tag ${ECR_REPO}:${IMAGE_TAG} ${ECR_URI}:latest
+
+        echo "Pushing BUILD_NUMBER image..."
+        docker push ${ECR_URI}:${IMAGE_TAG}
+
+        echo "Pushing latest image..."
+        docker push ${ECR_URI}:latest
+        """
+    }
+}
 
         stage('Register NEW Task Definition') {
             steps {
