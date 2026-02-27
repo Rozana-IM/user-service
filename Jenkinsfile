@@ -11,7 +11,7 @@ pipeline {
 
         ECS_CLUSTER = "DevCluster"
         ECS_SERVICE = "user-service1-service-8cgwko84"
-        TASK_FAMILY = "user-service1-task"
+        TASK_FAMILY = "user-service1"
     }
 
     stages {
