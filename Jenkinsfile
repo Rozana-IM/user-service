@@ -16,14 +16,19 @@ pipeline {
 
     stages {
 
+        // ================= CHECKOUT =================
         stage('Checkout') {
-            steps { checkout scm }
+            steps {
+                checkout scm
+            }
         }
 
+        // ================= LOGIN TO ECR =================
         stage('Login ECR') {
             steps {
                 sh '''
-                set -euxo pipefail
+                #!/bin/bash
+                set -eux
 
                 aws ecr get-login-password --region $AWS_REGION | \
                 docker login --username AWS \
@@ -32,40 +37,44 @@ pipeline {
             }
         }
 
+        // ================= BUILD & PUSH =================
         stage('Build & Push Image') {
             steps {
                 sh '''
-                set -euxo pipefail
+                #!/bin/bash
+                set -eux
+
+                echo "Building Docker image..."
 
                 docker build -t $ECR_REPO:$IMAGE_TAG .
 
                 docker tag $ECR_REPO:$IMAGE_TAG $ECR_URI:$IMAGE_TAG
+                docker tag $ECR_REPO:$IMAGE_TAG $ECR_URI:latest
+
+                echo "Pushing BUILD image..."
                 docker push $ECR_URI:$IMAGE_TAG
+
+                echo "Updating latest tag..."
+                docker push $ECR_URI:latest
                 '''
             }
         }
 
+        // ================= CREATE NEW TASK REVISION =================
         stage('Create NEW Task Revision') {
             steps {
                 sh '''
-                set -euxo pipefail
+                #!/bin/bash
+                set -eux
 
-                echo "Getting ACTIVE task definition ARN..."
-
-                TASK_ARN=$(aws ecs list-task-definitions \
-                  --family-prefix $TASK_FAMILY \
-                  --sort DESC \
-                  --max-items 1 \
-                  --region $AWS_REGION \
-                  --query "taskDefinitionArns[0]" \
-                  --output text)
-
-                echo "Current ARN: $TASK_ARN"
+                echo "Downloading existing task definition..."
 
                 aws ecs describe-task-definition \
-                  --task-definition $TASK_ARN \
+                  --task-definition $TASK_FAMILY \
                   --region $AWS_REGION \
                   > task-def.json
+
+                echo "Injecting new image..."
 
                 jq --arg IMAGE "$ECR_URI:$IMAGE_TAG" '
                   .taskDefinition
@@ -78,25 +87,36 @@ pipeline {
                       .registeredAt,
                       .registeredBy
                     )
-                  | .containerDefinitions[0].image = $IMAGE
-                ' task-def.json > new-task.json
+                  | .containerDefinitions |= map(
+                        if .name == "user-service1"
+                        then .image = $IMAGE
+                        else .
+                        end
+                    )
+                ' task-def.json > new-task-def.json
+
+                echo "Registering new revision..."
 
                 aws ecs register-task-definition \
                   --region $AWS_REGION \
-                  --cli-input-json file://new-task.json \
-                  > output.json
+                  --cli-input-json file://new-task-def.json \
+                  > task-output.json
 
-                jq -r '.taskDefinition.revision' output.json > revision.txt
+                jq -r '.taskDefinition.revision' task-output.json > revision.txt
                 '''
             }
         }
 
+        // ================= DEPLOY NEW REVISION =================
         stage('Deploy New Revision') {
             steps {
                 sh '''
-                set -euxo pipefail
+                #!/bin/bash
+                set -eux
 
                 REVISION=$(cat revision.txt)
+
+                echo "Deploying revision $REVISION"
 
                 aws ecs update-service \
                   --cluster $ECS_CLUSTER \
