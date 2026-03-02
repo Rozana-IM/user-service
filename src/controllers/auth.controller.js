@@ -9,15 +9,20 @@ const generateAccessToken = (user) =>
 const generateRefreshToken = (user) =>
   jwt.sign(user, process.env.JWT_SECRET, { expiresIn: "7d" });
 
-// ================= REGISTER =================
+
+// =================================================
+// ================= REGISTER USER =================
+// =================================================
 exports.registerUser = async (req, res) => {
   try {
     const { name, email, password } = req.body;
 
+    // validation
     if (!name || !email || !password) {
       return res.status(400).json({ error: "All fields are required" });
     }
 
+    // hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
     db.pool.query(
@@ -25,7 +30,10 @@ exports.registerUser = async (req, res) => {
       [name, email, hashedPassword],
       (err, result) => {
         if (err) {
-          return res.status(409).json({ error: "User already exists" });
+          console.error("❌ Register error:", err.message);
+          return res.status(409).json({
+            error: "User already exists. Please login.",
+          });
         }
 
         const user = {
@@ -38,12 +46,14 @@ exports.registerUser = async (req, res) => {
         const token = generateAccessToken(user);
         const refreshToken = generateRefreshToken(user);
 
+        // store refresh token
         db.pool.query(
           "UPDATE users SET refresh_token=? WHERE id=?",
           [refreshToken, user.id]
         );
 
         return res.status(201).json({
+          message: "User registered successfully",
           user,
           token,
           refreshToken,
@@ -51,19 +61,23 @@ exports.registerUser = async (req, res) => {
       }
     );
   } catch (err) {
-    console.error("❌ Register error:", err.message);
+    console.error("❌ Register exception:", err.message);
     res.status(500).json({ error: "Server error" });
   }
 };
 
-// ================= LOGIN =================
+
+// =================================================
+// ================= LOGIN USER ====================
+// =================================================
 exports.loginUser = (req, res) => {
-  return res.status(500).json({ error: "NEW LOGIN HIT" });
   try {
     const { email, password } = req.body;
 
     if (!email || !password) {
-      return res.status(400).json({ error: "Email and password required" });
+      return res.status(400).json({
+        error: "Email and password required",
+      });
     }
 
     db.pool.query(
@@ -71,32 +85,44 @@ exports.loginUser = (req, res) => {
       [email],
       async (err, results) => {
         if (err || results.length === 0) {
-          return res.status(401).json({ error: "Invalid credentials" });
+          return res.status(401).json({
+            error: "Invalid credentials",
+          });
         }
 
         const dbUser = results[0];
-        const match = await bcrypt.compare(password, dbUser.password);
+
+        // compare password
+        const match = await bcrypt.compare(
+          password,
+          dbUser.password
+        );
 
         if (!match) {
-          return res.status(401).json({ error: "Invalid credentials" });
+          return res.status(401).json({
+            error: "Invalid credentials",
+          });
         }
 
+        // ✅ IMPORTANT — role included
         const user = {
           id: dbUser.id,
           name: dbUser.name,
           email: dbUser.email,
-          role: dbUser.role, // ✅ REQUIRED FOR ADMIN
+          role: dbUser.role,
         };
 
         const token = generateAccessToken(user);
         const refreshToken = generateRefreshToken(user);
 
+        // update refresh token
         db.pool.query(
           "UPDATE users SET refresh_token=? WHERE id=?",
           [refreshToken, user.id]
         );
 
         return res.status(200).json({
+          message: "Login successful",
           user,
           token,
           refreshToken,
@@ -109,41 +135,58 @@ exports.loginUser = (req, res) => {
   }
 };
 
+
+// =================================================
 // ================= REFRESH TOKEN =================
+// =================================================
 exports.refreshToken = (req, res) => {
   try {
     const { refreshToken } = req.body;
 
     if (!refreshToken) {
-      return res.status(401).json({ error: "Refresh token missing" });
+      return res.status(401).json({
+        error: "Refresh token missing",
+      });
     }
 
-    jwt.verify(refreshToken, process.env.JWT_SECRET, (err, decoded) => {
-      if (err) return res.status(403).json({ error: "Invalid refresh token" });
-
-      db.pool.query(
-        "SELECT * FROM users WHERE id=? AND refresh_token=?",
-        [decoded.id, refreshToken],
-        (err, results) => {
-          if (err || results.length === 0) {
-            return res.status(403).json({ error: "Refresh token revoked" });
-          }
-
-          const dbUser = results[0];
-
-          const user = {
-            id: dbUser.id,
-            name: dbUser.name,
-            email: dbUser.email,
-            role: dbUser.role,
-          };
-
-          const newToken = generateAccessToken(user);
-
-          return res.status(200).json({ token: newToken });
+    jwt.verify(
+      refreshToken,
+      process.env.JWT_SECRET,
+      (err, decoded) => {
+        if (err) {
+          return res.status(403).json({
+            error: "Invalid refresh token",
+          });
         }
-      );
-    });
+
+        db.pool.query(
+          "SELECT * FROM users WHERE id=? AND refresh_token=?",
+          [decoded.id, refreshToken],
+          (err, results) => {
+            if (err || results.length === 0) {
+              return res.status(403).json({
+                error: "Refresh token revoked",
+              });
+            }
+
+            const dbUser = results[0];
+
+            const user = {
+              id: dbUser.id,
+              name: dbUser.name,
+              email: dbUser.email,
+              role: dbUser.role,
+            };
+
+            const newToken = generateAccessToken(user);
+
+            return res.status(200).json({
+              token: newToken,
+            });
+          }
+        );
+      }
+    );
   } catch (err) {
     console.error("❌ Refresh token error:", err.message);
     res.status(500).json({ error: "Server error" });
