@@ -49,21 +49,19 @@ pipeline {
             }
         }
 
-       stage('Register NEW Task Definition') {
+      stage('Register NEW Task Definition') {
     steps {
         sh '''
-        set -ex   # ← shows commands + stops on error
+        set -ex
 
-        echo "Fetching task definition..."
+        echo "Downloading current task definition..."
 
         aws ecs describe-task-definition \
           --task-definition $TASK_FAMILY \
           --region $AWS_REGION \
           > task-def.json
 
-        cat task-def.json | head -20
-
-        echo "Updating image..."
+        echo "Updating container image..."
 
         jq --arg IMAGE "$ECR_URI:$IMAGE_TAG" '
           .taskDefinition
@@ -76,17 +74,20 @@ pipeline {
               .registeredAt,
               .registeredBy
             )
-          | .containerDefinitions[0].image = $IMAGE
+          | .containerDefinitions |= map(
+                if .name == "user-service1"
+                then .image = $IMAGE
+                else .
+                end
+            )
         ' task-def.json > new-task-def.json
 
-        echo "Registering revision..."
+        echo "Registering new revision..."
 
         aws ecs register-task-definition \
           --region $AWS_REGION \
           --cli-input-json file://new-task-def.json \
           > task-output.json
-
-        cat task-output.json
 
         jq -r '.taskDefinition.revision' task-output.json > revision.txt
         '''
