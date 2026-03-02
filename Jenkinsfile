@@ -16,17 +16,16 @@ pipeline {
 
     stages {
 
-        // ================= CHECKOUT =================
         stage('Checkout') {
             steps {
                 checkout scm
             }
         }
 
-        // ================= LOGIN ECR =================
         stage('Login to ECR') {
             steps {
                 sh '''
+                set -e
                 aws ecr get-login-password --region $AWS_REGION | \
                 docker login --username AWS \
                 --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
@@ -34,47 +33,51 @@ pipeline {
             }
         }
 
-        // ================= BUILD IMAGE =================
         stage('Build & Push Image') {
             steps {
                 sh '''
-                echo "Building Docker image..."
+                set -e
 
                 docker build -t $ECR_REPO:$IMAGE_TAG .
 
                 docker tag $ECR_REPO:$IMAGE_TAG $ECR_URI:$IMAGE_TAG
                 docker tag $ECR_REPO:$IMAGE_TAG $ECR_URI:latest
 
-                echo "Pushing build image..."
                 docker push $ECR_URI:$IMAGE_TAG
-
-                echo "Updating latest tag..."
                 docker push $ECR_URI:latest
                 '''
             }
         }
 
-        // ================= REGISTER TASK REVISION =================
         stage('Register NEW Task Definition') {
             steps {
                 sh '''
-                echo "Creating new ECS task revision..."
+                set -e
+
+                echo "Downloading current task definition..."
 
                 aws ecs describe-task-definition \
                   --task-definition $TASK_FAMILY \
                   --region $AWS_REGION \
-                | jq '.taskDefinition
-                    | del(
-                        .taskDefinitionArn,
-                        .revision,
-                        .status,
-                        .requiresAttributes,
-                        .compatibilities,
-                        .registeredAt,
-                        .registeredBy
-                      )
-                    | .containerDefinitions[0].image = "'$ECR_URI':'$IMAGE_TAG'"
-                  ' > new-task-def.json
+                  > task-def.json
+
+                echo "Updating image using SAFE jq..."
+
+                jq --arg IMAGE "$ECR_URI:$IMAGE_TAG" '
+                  .taskDefinition
+                  | del(
+                      .taskDefinitionArn,
+                      .revision,
+                      .status,
+                      .requiresAttributes,
+                      .compatibilities,
+                      .registeredAt,
+                      .registeredBy
+                    )
+                  | .containerDefinitions[0].image = $IMAGE
+                ' task-def.json > new-task-def.json
+
+                echo "Registering new revision..."
 
                 aws ecs register-task-definition \
                   --region $AWS_REGION \
@@ -86,13 +89,14 @@ pipeline {
             }
         }
 
-        // ================= DEPLOY EXACT REVISION =================
-        stage('Deploy EXACT Revision to ECS') {
+        stage('Deploy EXACT Revision') {
             steps {
                 sh '''
+                set -e
+
                 REVISION=$(cat revision.txt)
 
-                echo "Deploying revision: $REVISION"
+                echo "Deploying revision $REVISION"
 
                 aws ecs update-service \
                   --cluster $ECS_CLUSTER \
