@@ -49,45 +49,49 @@ pipeline {
             }
         }
 
-        stage('Register NEW Task Definition') {
-            steps {
-                sh '''
-                set -e
+       stage('Register NEW Task Definition') {
+    steps {
+        sh '''
+        set -ex   # ← shows commands + stops on error
 
-                echo "Downloading current task definition..."
+        echo "Fetching task definition..."
 
-                aws ecs describe-task-definition \
-                  --task-definition $TASK_FAMILY \
-                  --region $AWS_REGION \
-                  > task-def.json
+        aws ecs describe-task-definition \
+          --task-definition $TASK_FAMILY \
+          --region $AWS_REGION \
+          > task-def.json
 
-                echo "Updating image using SAFE jq..."
+        cat task-def.json | head -20
 
-                jq --arg IMAGE "$ECR_URI:$IMAGE_TAG" '
-                  .taskDefinition
-                  | del(
-                      .taskDefinitionArn,
-                      .revision,
-                      .status,
-                      .requiresAttributes,
-                      .compatibilities,
-                      .registeredAt,
-                      .registeredBy
-                    )
-                  | .containerDefinitions[0].image = $IMAGE
-                ' task-def.json > new-task-def.json
+        echo "Updating image..."
 
-                echo "Registering new revision..."
+        jq --arg IMAGE "$ECR_URI:$IMAGE_TAG" '
+          .taskDefinition
+          | del(
+              .taskDefinitionArn,
+              .revision,
+              .status,
+              .requiresAttributes,
+              .compatibilities,
+              .registeredAt,
+              .registeredBy
+            )
+          | .containerDefinitions[0].image = $IMAGE
+        ' task-def.json > new-task-def.json
 
-                aws ecs register-task-definition \
-                  --region $AWS_REGION \
-                  --cli-input-json file://new-task-def.json \
-                  > task-output.json
+        echo "Registering revision..."
 
-                jq -r '.taskDefinition.revision' task-output.json > revision.txt
-                '''
-            }
-        }
+        aws ecs register-task-definition \
+          --region $AWS_REGION \
+          --cli-input-json file://new-task-def.json \
+          > task-output.json
+
+        cat task-output.json
+
+        jq -r '.taskDefinition.revision' task-output.json > revision.txt
+        '''
+    }
+}
 
         stage('Deploy EXACT Revision') {
             steps {
