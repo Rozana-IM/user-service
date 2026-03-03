@@ -3,6 +3,7 @@ const jwt = require("jsonwebtoken");
 const db = require("../db");
 
 // ================= TOKEN HELPERS =================
+
 const generateAccessToken = (user) =>
   jwt.sign(user, process.env.JWT_SECRET, { expiresIn: "15m" });
 
@@ -13,16 +14,15 @@ const generateRefreshToken = (user) =>
 // =================================================
 // ================= REGISTER USER =================
 // =================================================
+
 exports.registerUser = async (req, res) => {
   try {
     const { name, email, password } = req.body;
 
-    // validation
     if (!name || !email || !password) {
       return res.status(400).json({ error: "All fields are required" });
     }
 
-    // hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
     db.pool.query(
@@ -46,7 +46,6 @@ exports.registerUser = async (req, res) => {
         const token = generateAccessToken(user);
         const refreshToken = generateRefreshToken(user);
 
-        // store refresh token
         db.pool.query(
           "UPDATE users SET refresh_token=? WHERE id=?",
           [refreshToken, user.id]
@@ -70,6 +69,7 @@ exports.registerUser = async (req, res) => {
 // =================================================
 // ================= LOGIN USER ====================
 // =================================================
+
 exports.loginUser = (req, res) => {
   try {
     const { email, password } = req.body;
@@ -92,7 +92,6 @@ exports.loginUser = (req, res) => {
 
         const dbUser = results[0];
 
-        // compare password
         const match = await bcrypt.compare(
           password,
           dbUser.password
@@ -104,7 +103,6 @@ exports.loginUser = (req, res) => {
           });
         }
 
-        // ✅ IMPORTANT — role included
         const user = {
           id: dbUser.id,
           name: dbUser.name,
@@ -115,7 +113,6 @@ exports.loginUser = (req, res) => {
         const token = generateAccessToken(user);
         const refreshToken = generateRefreshToken(user);
 
-        // update refresh token
         db.pool.query(
           "UPDATE users SET refresh_token=? WHERE id=?",
           [refreshToken, user.id]
@@ -139,6 +136,7 @@ exports.loginUser = (req, res) => {
 // =================================================
 // ================= REFRESH TOKEN =================
 // =================================================
+
 exports.refreshToken = (req, res) => {
   try {
     const { refreshToken } = req.body;
@@ -153,6 +151,7 @@ exports.refreshToken = (req, res) => {
       refreshToken,
       process.env.JWT_SECRET,
       (err, decoded) => {
+
         if (err) {
           return res.status(403).json({
             error: "Invalid refresh token",
@@ -163,6 +162,7 @@ exports.refreshToken = (req, res) => {
           "SELECT * FROM users WHERE id=? AND refresh_token=?",
           [decoded.id, refreshToken],
           (err, results) => {
+
             if (err || results.length === 0) {
               return res.status(403).json({
                 error: "Refresh token revoked",
@@ -191,4 +191,34 @@ exports.refreshToken = (req, res) => {
     console.error("❌ Refresh token error:", err.message);
     res.status(500).json({ error: "Server error" });
   }
+};
+
+
+// =================================================
+// ================= ADMIN - GET USERS =============
+// =================================================
+
+exports.getAllUsers = (req, res) => {
+
+  // 🔒 ADMIN ONLY ACCESS
+  if (req.user.role !== "admin") {
+    return res.status(403).json({
+      error: "Admin access only",
+    });
+  }
+
+  db.pool.query(
+    "SELECT id, name, email, role FROM users",
+    (err, results) => {
+
+      if (err) {
+        console.error("❌ Fetch users error:", err.message);
+        return res.status(500).json({
+          error: "Database error",
+        });
+      }
+
+      res.status(200).json(results);
+    }
+  );
 };
