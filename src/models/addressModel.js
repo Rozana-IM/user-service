@@ -1,5 +1,4 @@
-const db = require("../config/db");
-
+const db = require("../db");
 exports.addAddress = (userId, data, callback) => {
 
 const sql = `
