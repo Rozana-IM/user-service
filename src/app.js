@@ -8,6 +8,10 @@ const authRoutes = require("./routes/auth.routes");
 const app = express();
 const PORT = process.env.PORT || 4000;
 
+const addressRoutes = require("./routes/addressRoutes");
+
+app.use("/", addressRoutes);
+
 // ================= Middleware =================
 app.use(express.json());
 
