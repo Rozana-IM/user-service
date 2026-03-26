@@ -10,7 +10,7 @@ const PORT = process.env.PORT || 4000;
 
 const addressRoutes = require("./routes/addressRoutes");
 
-app.use("/", addressRoutes);
+app.use("/users", authRoutes);
 
 // ================= Middleware =================
 app.use(express.json());
@@ -28,7 +28,7 @@ db.connect();
 
 // ================= Routes =================
 // 🔥 IMPORTANT: mount at ROOT
-app.use("/", authRoutes);
+app.use("/users", authRoutes);
 
 // ================= Health =================
 app.get("/health", (req, res) => {
