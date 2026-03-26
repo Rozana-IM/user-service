@@ -11,7 +11,7 @@ pipeline {
 
         ECS_CLUSTER = "lucci-cluster"
         ECS_SERVICE = "user-service-service-6jrk52i5"
-        TASK_FAMILY = "user-service1"
+        TASK_FAMILY = "user-service"
     }
 
     stages {
@@ -88,7 +88,7 @@ pipeline {
                       .registeredBy
                     )
                   | .containerDefinitions |= map(
-                        if .name == "user-service1"
+                        if .name == "user-service"
                         then .image = $IMAGE
                         else .
                         end
