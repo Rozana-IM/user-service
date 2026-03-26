@@ -24,7 +24,10 @@ app.use(
 );
 
 // ================= DB Connection =================
-db.connect();
+// ✅ Non-blocking DB connection
+db.connect()
+  .then(() => console.log("DB connected"))
+  .catch(err => console.error("DB error:", err));
 
 // ================= Routes =================
 // 🔥 IMPORTANT: mount at ROOT
