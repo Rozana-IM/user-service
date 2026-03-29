@@ -19,6 +19,7 @@ app.use(cors({
 }));
 
 app.use("/users", authRoutes);
+app.use("/", addressRoutes);
 
 // ================= DB Connection =================
 // ✅ Non-blocking DB connection
