@@ -38,27 +38,22 @@ pipeline {
         }
 
         // ================= BUILD & PUSH =================
-        stage('Build & Push Image') {
-            steps {
-                sh '''
-                #!/bin/bash
-                set -eux
-
-                echo "Building Docker image..."
-
-                docker build -t $ECR_REPO:$IMAGE_TAG .
-
-                docker tag $ECR_REPO:$IMAGE_TAG $ECR_URI:$IMAGE_TAG
-                docker tag $ECR_REPO:$IMAGE_TAG $ECR_URI:latest
-
-                echo "Pushing BUILD image..."
-                docker push $ECR_URI:$IMAGE_TAG
-
-                echo "Updating latest tag..."
-                docker push $ECR_URI:latest
-                '''
-            }
-        }
+       stage('Build & Push Image') {
+    steps {
+        sh '''
+        set -eux
+        
+        docker system prune -af
+        
+        echo "Building Docker image..."
+        docker build --no-cache -t user-service:${BUILD_NUMBER} .
+        
+        docker tag user-service:${BUILD_NUMBER} 789890001348.dkr.ecr.us-east-1.amazonaws.com/user-service:${BUILD_NUMBER}
+        
+        docker push 789890001348.dkr.ecr.us-east-1.amazonaws.com/user-service:${BUILD_NUMBER}
+        '''
+    }
+}
 
         // ================= CREATE NEW TASK REVISION =================
         stage('Create NEW Task Revision') {
