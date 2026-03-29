@@ -35,8 +35,7 @@ app.use("/users", authRoutes);
 
 // ================= Health =================
 app.get("/health", (req, res) => {
-  res.status(200).send("User Service is healthy");
-});
+res.status(200).json({ status: "ok" });});
 
 // ================= Start =================
 app.listen(PORT, "0.0.0.0", () => {
