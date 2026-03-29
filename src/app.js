@@ -24,8 +24,6 @@ app.use("/", addressRoutes);
 // ================= DB Connection =================
 // ✅ Non-blocking DB connection
 db.connect()
-  .then(() => console.log("DB connected"))
-  .catch(err => console.error("DB error:", err));
 
 // ================= Health =================
 app.get("/health", (req, res) => {
