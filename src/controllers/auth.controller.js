@@ -67,12 +67,8 @@ exports.registerUser = async (req, res) => {
 // ================= LOGIN USER ====================
 // =================================================
 exports.loginUser = async (req, res) => {
-  console.log("🔥 LOGIN HIT");
-
   try {
     const { email, password } = req.body;
-
-    console.log("👉 BODY:", req.body);
 
     if (!email || !password) {
       return res.status(400).json({
@@ -80,14 +76,10 @@ exports.loginUser = async (req, res) => {
       });
     }
 
-    console.log("⏳ Running DB query...");
-
     const results = await db.query(
       "SELECT * FROM users WHERE email = ?",
       [email]
     );
-
-    console.log("✅ DB RESULT:", results);
 
     if (!results || results.length === 0) {
       return res.status(401).json({
@@ -97,21 +89,13 @@ exports.loginUser = async (req, res) => {
 
     const dbUser = results[0];
 
-    // 🔥 ADD THIS DEBUG HERE
-    console.log("👉 DB PASSWORD:", dbUser.password);
-    console.log("👉 INPUT PASSWORD:", password);
-
     const match = await bcrypt.compare(password, dbUser.password);
-
-    console.log("👉 PASSWORD MATCH:", match);
 
     if (!match) {
       return res.status(401).json({
         error: "Invalid credentials",
       });
     }
-
-    console.log("⏳ Updating refresh token...");
 
     const user = {
       id: dbUser.id,
@@ -120,20 +104,13 @@ exports.loginUser = async (req, res) => {
       role: dbUser.role,
     };
 
-    const token = jwt.sign(user, process.env.JWT_SECRET, {
-      expiresIn: "15m",
-    });
-
-    const refreshToken = jwt.sign(user, process.env.JWT_SECRET, {
-      expiresIn: "7d",
-    });
+    const token = generateAccessToken(user);
+    const refreshToken = generateRefreshToken(user);
 
     await db.query(
       "UPDATE users SET refresh_token=? WHERE id=?",
       [refreshToken, user.id]
     );
-
-    console.log("✅ LOGIN SUCCESS");
 
     return res.status(200).json({
       message: "Login successful",
