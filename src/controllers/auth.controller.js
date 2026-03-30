@@ -70,31 +70,71 @@ exports.loginUser = async (req, res) => {
   console.log("🔥 LOGIN HIT");
 
   try {
-    console.log("👉 BODY:", req.body);
-
     const { email, password } = req.body;
 
-    console.log("⏳ Running DB query...");
+    if (!email || !password) {
+      return res.status(400).json({
+        error: "Email and password required",
+      });
+    }
 
     const results = await db.query(
       "SELECT * FROM users WHERE email = ?",
       [email]
     );
 
-    console.log("✅ DB RESULT:", results);
-
     if (!results || results.length === 0) {
-      return res.status(401).json({ error: "Invalid credentials" });
+      return res.status(401).json({
+        error: "Invalid credentials",
+      });
     }
 
-    return res.json({ message: "LOGIN WORKING" });
+    const dbUser = results[0];
+
+    const match = await bcrypt.compare(password, dbUser.password);
+
+    if (!match) {
+      return res.status(401).json({
+        error: "Invalid credentials",
+      });
+    }
+
+    const user = {
+      id: dbUser.id,
+      name: dbUser.name,
+      email: dbUser.email,
+      role: dbUser.role,
+    };
+
+    const token = jwt.sign(user, process.env.JWT_SECRET, {
+      expiresIn: "15m",
+    });
+
+    const refreshToken = jwt.sign(user, process.env.JWT_SECRET, {
+      expiresIn: "7d",
+    });
+
+    await db.query(
+      "UPDATE users SET refresh_token=? WHERE id=?",
+      [refreshToken, user.id]
+    );
+
+    console.log("✅ LOGIN SUCCESS");
+
+    return res.status(200).json({
+      message: "Login successful",
+      user,
+      token,
+      refreshToken,
+    });
 
   } catch (err) {
-    console.error("❌ LOGIN ERROR FULL:", err);
-    return res.status(500).json({ error: "Server error" });
+    console.error("❌ LOGIN ERROR:", err);
+    return res.status(500).json({
+      error: "Server error",
+    });
   }
 };
-
 // =================================================
 // ================= REFRESH TOKEN =================
 // =================================================
