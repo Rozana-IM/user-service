@@ -71,8 +71,12 @@ exports.registerUser = async (req, res) => {
 // =================================================
 
 exports.loginUser = (req, res) => {
+  console.log("🔥 LOGIN API HIT");
+
   try {
     const { email, password } = req.body;
+
+    console.log("📥 Input:", email);
 
     if (!email || !password) {
       return res.status(400).json({
@@ -80,17 +84,32 @@ exports.loginUser = (req, res) => {
       });
     }
 
+    console.log("⏳ Running DB query...");
+
     db.pool.query(
       "SELECT * FROM users WHERE email = ?",
       [email],
       async (err, results) => {
-        if (err || results.length === 0) {
+
+        console.log("📦 DB CALLBACK HIT");
+
+        // 🔴 VERY IMPORTANT
+        if (err) {
+          console.error("❌ DB ERROR:", err);
+          return res.status(500).json({
+            error: "Database error",
+          });
+        }
+
+        if (!results || results.length === 0) {
           return res.status(401).json({
             error: "Invalid credentials",
           });
         }
 
         const dbUser = results[0];
+
+        console.log("👤 User found:", dbUser.email);
 
         const match = await bcrypt.compare(
           password,
@@ -115,8 +134,15 @@ exports.loginUser = (req, res) => {
 
         db.pool.query(
           "UPDATE users SET refresh_token=? WHERE id=?",
-          [refreshToken, user.id]
+          [refreshToken, user.id],
+          (err) => {
+            if (err) {
+              console.error("⚠️ Refresh token update failed:", err);
+            }
+          }
         );
+
+        console.log("✅ LOGIN SUCCESS");
 
         return res.status(200).json({
           message: "Login successful",
@@ -126,14 +152,13 @@ exports.loginUser = (req, res) => {
         });
       }
     );
+
   } catch (err) {
-    console.error("❌ Login error:", err.message);
-    res.status(500).json({ error: "Server error" });
+    console.error("❌ Login error:", err);
+    return res.status(500).json({ error: "Server error" });
   }
 };
-
-
-// =================================================
+//       ========================
 // ================= REFRESH TOKEN =================
 // =================================================
 
