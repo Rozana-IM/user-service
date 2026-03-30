@@ -17,6 +17,8 @@ const generateRefreshToken = (user) =>
 
 exports.registerUser = async (req, res) => {
   try {
+    console.log("🔥 REGISTER HIT");
+
     const { name, email, password } = req.body;
 
     if (!name || !email || !password) {
@@ -25,43 +27,38 @@ exports.registerUser = async (req, res) => {
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    db.pool.query(
+    const result = await db.query(
       "INSERT INTO users (name, email, password, role) VALUES (?, ?, ?, 'user')",
-      [name, email, hashedPassword],
-      (err, result) => {
-        if (err) {
-          console.error("❌ Register error:", err.message);
-          return res.status(409).json({
-            error: "User already exists. Please login.",
-          });
-        }
-
-        const user = {
-          id: result.insertId,
-          name,
-          email,
-          role: "user",
-        };
-
-        const token = generateAccessToken(user);
-        const refreshToken = generateRefreshToken(user);
-
-        db.pool.query(
-          "UPDATE users SET refresh_token=? WHERE id=?",
-          [refreshToken, user.id]
-        );
-
-        return res.status(201).json({
-          message: "User registered successfully",
-          user,
-          token,
-          refreshToken,
-        });
-      }
+      [name, email, hashedPassword]
     );
+
+    const user = {
+      id: result.insertId,
+      name,
+      email,
+      role: "user",
+    };
+
+    const token = generateAccessToken(user);
+    const refreshToken = generateRefreshToken(user);
+
+    await db.query(
+      "UPDATE users SET refresh_token=? WHERE id=?",
+      [refreshToken, user.id]
+    );
+
+    return res.status(201).json({
+      message: "User registered successfully",
+      user,
+      token,
+      refreshToken,
+    });
+
   } catch (err) {
-    console.error("❌ Register exception:", err.message);
-    res.status(500).json({ error: "Server error" });
+    console.error("❌ REGISTER ERROR:", err);
+    return res.status(500).json({
+      error: "Server error",
+    });
   }
 };
 
@@ -70,13 +67,11 @@ exports.registerUser = async (req, res) => {
 // ================= LOGIN USER ====================
 // =================================================
 
-exports.loginUser = (req, res) => {
-  console.log("🔥 LOGIN API HIT");
+exports.loginUser = async (req, res) => {
+  console.log("🔥 LOGIN HIT");
 
   try {
     const { email, password } = req.body;
-
-    console.log("📥 Input:", email);
 
     if (!email || !password) {
       return res.status(400).json({
@@ -84,86 +79,66 @@ exports.loginUser = (req, res) => {
       });
     }
 
-    console.log("⏳ Running DB query...");
-
-    db.pool.query(
+    const results = await db.query(
       "SELECT * FROM users WHERE email = ?",
-      [email],
-      async (err, results) => {
-
-        console.log("📦 DB CALLBACK HIT");
-
-        // 🔴 VERY IMPORTANT
-        if (err) {
-          console.error("❌ DB ERROR:", err);
-          return res.status(500).json({
-            error: "Database error",
-          });
-        }
-
-        if (!results || results.length === 0) {
-          return res.status(401).json({
-            error: "Invalid credentials",
-          });
-        }
-
-        const dbUser = results[0];
-
-        console.log("👤 User found:", dbUser.email);
-
-        const match = await bcrypt.compare(
-          password,
-          dbUser.password
-        );
-
-        if (!match) {
-          return res.status(401).json({
-            error: "Invalid credentials",
-          });
-        }
-
-        const user = {
-          id: dbUser.id,
-          name: dbUser.name,
-          email: dbUser.email,
-          role: dbUser.role,
-        };
-
-        const token = generateAccessToken(user);
-        const refreshToken = generateRefreshToken(user);
-
-        db.pool.query(
-          "UPDATE users SET refresh_token=? WHERE id=?",
-          [refreshToken, user.id],
-          (err) => {
-            if (err) {
-              console.error("⚠️ Refresh token update failed:", err);
-            }
-          }
-        );
-
-        console.log("✅ LOGIN SUCCESS");
-
-        return res.status(200).json({
-          message: "Login successful",
-          user,
-          token,
-          refreshToken,
-        });
-      }
+      [email]
     );
 
+    if (!results || results.length === 0) {
+      return res.status(401).json({
+        error: "Invalid credentials",
+      });
+    }
+
+    const dbUser = results[0];
+
+    const match = await bcrypt.compare(password, dbUser.password);
+
+    if (!match) {
+      return res.status(401).json({
+        error: "Invalid credentials",
+      });
+    }
+
+    const user = {
+      id: dbUser.id,
+      name: dbUser.name,
+      email: dbUser.email,
+      role: dbUser.role,
+    };
+
+    const token = generateAccessToken(user);
+    const refreshToken = generateRefreshToken(user);
+
+    await db.query(
+      "UPDATE users SET refresh_token=? WHERE id=?",
+      [refreshToken, user.id]
+    );
+
+    return res.status(200).json({
+      message: "Login successful",
+      user,
+      token,
+      refreshToken,
+    });
+
   } catch (err) {
-    console.error("❌ Login error:", err);
-    return res.status(500).json({ error: "Server error" });
+    console.error("❌ LOGIN ERROR:", err);
+    return res.status(500).json({
+      error: "Server error",
+    });
   }
 };
-//       ========================
+
+
+// =================================================
 // ================= REFRESH TOKEN =================
 // =================================================
 
-exports.refreshToken = (req, res) => {
+exports.refreshToken = async (req, res) => {
   try {
+    console.log("🔥 REFRESH TOKEN HIT");
+
     const { refreshToken } = req.body;
 
     if (!refreshToken) {
@@ -172,49 +147,39 @@ exports.refreshToken = (req, res) => {
       });
     }
 
-    jwt.verify(
-      refreshToken,
-      process.env.JWT_SECRET,
-      (err, decoded) => {
+    const decoded = jwt.verify(refreshToken, process.env.JWT_SECRET);
 
-        if (err) {
-          return res.status(403).json({
-            error: "Invalid refresh token",
-          });
-        }
-
-        db.pool.query(
-          "SELECT * FROM users WHERE id=? AND refresh_token=?",
-          [decoded.id, refreshToken],
-          (err, results) => {
-
-            if (err || results.length === 0) {
-              return res.status(403).json({
-                error: "Refresh token revoked",
-              });
-            }
-
-            const dbUser = results[0];
-
-            const user = {
-              id: dbUser.id,
-              name: dbUser.name,
-              email: dbUser.email,
-              role: dbUser.role,
-            };
-
-            const newToken = generateAccessToken(user);
-
-            return res.status(200).json({
-              token: newToken,
-            });
-          }
-        );
-      }
+    const results = await db.query(
+      "SELECT * FROM users WHERE id=? AND refresh_token=?",
+      [decoded.id, refreshToken]
     );
+
+    if (!results || results.length === 0) {
+      return res.status(403).json({
+        error: "Refresh token revoked",
+      });
+    }
+
+    const dbUser = results[0];
+
+    const user = {
+      id: dbUser.id,
+      name: dbUser.name,
+      email: dbUser.email,
+      role: dbUser.role,
+    };
+
+    const newToken = generateAccessToken(user);
+
+    return res.status(200).json({
+      token: newToken,
+    });
+
   } catch (err) {
-    console.error("❌ Refresh token error:", err.message);
-    res.status(500).json({ error: "Server error" });
+    console.error("❌ REFRESH ERROR:", err);
+    return res.status(500).json({
+      error: "Server error",
+    });
   }
 };
 
@@ -223,27 +188,26 @@ exports.refreshToken = (req, res) => {
 // ================= ADMIN - GET USERS =============
 // =================================================
 
-exports.getAllUsers = (req, res) => {
+exports.getAllUsers = async (req, res) => {
+  try {
+    console.log("🔥 GET USERS HIT");
 
-  // 🔒 ADMIN ONLY ACCESS
-  if (req.user.role !== "admin") {
-    return res.status(403).json({
-      error: "Admin access only",
+    if (req.user.role !== "admin") {
+      return res.status(403).json({
+        error: "Admin access only",
+      });
+    }
+
+    const users = await db.query(
+      "SELECT id, name, email, role FROM users"
+    );
+
+    return res.status(200).json(users);
+
+  } catch (err) {
+    console.error("❌ GET USERS ERROR:", err);
+    return res.status(500).json({
+      error: "Database error",
     });
   }
-
-  db.pool.query(
-    "SELECT id, name, email, role FROM users",
-    (err, results) => {
-
-      if (err) {
-        console.error("❌ Fetch users error:", err.message);
-        return res.status(500).json({
-          error: "Database error",
-        });
-      }
-
-      res.status(200).json(results);
-    }
-  );
 };
