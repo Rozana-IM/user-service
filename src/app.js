@@ -1,6 +1,10 @@
 const express = require("express");
 const cors = require("cors");
 const db = require("./db");
+app.use((req, res, next) => {
+  res.removeHeader("Content-Security-Policy");
+  next();
+});
 
 // 👉 IMPORT ROUTES EXPLICITLY
 const authRoutes = require("./routes/auth.routes");
