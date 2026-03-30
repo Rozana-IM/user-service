@@ -72,16 +72,22 @@ exports.loginUser = async (req, res) => {
   try {
     const { email, password } = req.body;
 
+    console.log("👉 BODY:", req.body);
+
     if (!email || !password) {
       return res.status(400).json({
         error: "Email and password required",
       });
     }
 
+    console.log("⏳ Running DB query...");
+
     const results = await db.query(
       "SELECT * FROM users WHERE email = ?",
       [email]
     );
+
+    console.log("✅ DB RESULT:", results);
 
     if (!results || results.length === 0) {
       return res.status(401).json({
@@ -91,13 +97,21 @@ exports.loginUser = async (req, res) => {
 
     const dbUser = results[0];
 
+    // 🔥 ADD THIS DEBUG HERE
+    console.log("👉 DB PASSWORD:", dbUser.password);
+    console.log("👉 INPUT PASSWORD:", password);
+
     const match = await bcrypt.compare(password, dbUser.password);
+
+    console.log("👉 PASSWORD MATCH:", match);
 
     if (!match) {
       return res.status(401).json({
         error: "Invalid credentials",
       });
     }
+
+    console.log("⏳ Updating refresh token...");
 
     const user = {
       id: dbUser.id,
@@ -135,6 +149,7 @@ exports.loginUser = async (req, res) => {
     });
   }
 };
+
 // =================================================
 // ================= REFRESH TOKEN =================
 // =================================================
