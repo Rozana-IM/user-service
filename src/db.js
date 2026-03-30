@@ -7,7 +7,7 @@ Create MySQL Connection Pool
 */
 
 const pool = mysql.createPool({
-  host: process.env.DB_HOST,
+  host: process.env.DB_HOST,   // ⚠️ MUST be RDS endpoint (not localhost)
   user: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
   database: process.env.DB_NAME,
@@ -17,38 +17,37 @@ const pool = mysql.createPool({
   connectionLimit: 10,
   queueLimit: 0,
 
-  enableKeepAlive: true,
-  keepAliveInitialDelay: 0
+  connectTimeout: 10000 // ⏱️ prevents hanging (VERY IMPORTANT)
 });
 
 /*
 =========================================
-Test Database Connection (ASYNC)
+Test Database Connection
 =========================================
 */
 
 async function connect() {
   try {
     const connection = await pool.getConnection();
-    console.log("✅ User Service DB connected");
+    console.log("✅ DB CONNECTED SUCCESSFULLY");
     connection.release();
   } catch (err) {
-    console.error("❌ User Service DB connection failed:", err.message);
+    console.error("❌ DB CONNECTION FAILED:", err);
   }
 }
 
 /*
 =========================================
-Helper Query Function (OPTIONAL)
+Query Helper (USE THIS ALWAYS)
 =========================================
 */
 
-async function query(sql, params) {
+async function query(sql, params = []) {
   try {
     const [rows] = await pool.execute(sql, params);
     return rows;
   } catch (err) {
-    console.error("❌ DB query error:", err.message);
+    console.error("❌ DB QUERY ERROR:", err);
     throw err;
   }
 }
