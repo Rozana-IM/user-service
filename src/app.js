@@ -2,9 +2,9 @@ const express = require("express");
 const cors = require("cors");
 const db = require("./db");
 
-const app = express(); // ✅ MUST COME FIRST
+const app = express();   // ✅ CREATE FIRST
 
-// 🔥 REMOVE CSP HEADER (FIX)
+// ✅ REMOVE CSP HEADER
 app.use((req, res, next) => {
   res.removeHeader("Content-Security-Policy");
   next();
@@ -13,8 +13,6 @@ app.use((req, res, next) => {
 // 👉 IMPORT ROUTES
 const authRoutes = require("./routes/auth.routes");
 const addressRoutes = require("./routes/addressRoutes");
-
-const PORT = process.env.PORT || 4000;
 
 app.use(express.json());
 
@@ -27,15 +25,12 @@ app.use(cors({
 app.use("/users", authRoutes);
 app.use("/", addressRoutes);
 
-// ================= DB =================
-db.connect();
-
-// ================= HEALTH =================
+// HEALTH
 app.get("/health", (req, res) => {
   res.status(200).json({ status: "ok" });
 });
 
-// ================= START =================
-app.listen(PORT, "0.0.0.0", () => {
-  console.log(`✅ User Service running on port ${PORT}`);
+// START
+app.listen(4000, "0.0.0.0", () => {
+  console.log("✅ User Service running");
 });
