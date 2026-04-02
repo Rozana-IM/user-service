@@ -6,5 +6,6 @@ const addressController = require("../controllers/addressController");
 router.post("/users/:id/address", addressController.addAddress);
 
 router.get("/users/:id/addresses", addressController.getAddresses);
+router.post("/refresh-token", refreshToken);
 
 module.exports = router;
