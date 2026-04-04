@@ -1,3 +1,6 @@
+console.log("verifyToken:", verifyToken);
+console.log("verifyAdmin:", verifyAdmin);
+console.log("getAllUsers:", authController.getAllUsers);
 const express = require("express");
 const router = express.Router();
 
