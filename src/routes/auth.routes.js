@@ -3,7 +3,7 @@ const router = express.Router();
 
 const authController = require("../controllers/auth.controller");
 
-// ✅ MUST MATCH NAME EXACTLY
+// ✅ MUST MATCH EXACT EXPORT NAME
 const { verifyToken, verifyAdmin } = require("../middleware/auth.middleware");
 
 // ================= AUTH =================
