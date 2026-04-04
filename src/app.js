@@ -17,7 +17,8 @@ app.use(express.json());
 
 app.use(cors({
   origin: process.env.FRONTEND_URL || "https://rozana-projects.online",
-  methods: ["GET", "POST"],
+  methods: ["GET", "POST", "PUT", "DELETE"],
+  allowedHeaders: ["Content-Type", "Authorization"],
   credentials: true,
 }));
 
