@@ -1,20 +1,17 @@
 const express = require("express");
 const cors = require("cors");
-const db = require("./db");
 
-const app = express();   // ✅ CREATE FIRST
+const app = express();
 
-// ✅ REMOVE CSP HEADER
+// REMOVE CSP
 app.use((req, res, next) => {
   res.removeHeader("Content-Security-Policy");
   next();
 });
 
-// 👉 IMPORT ROUTES
-const authRoutes = require("./routes/auth.routes");
-
 app.use(express.json());
 
+// ✅ FIXED CORS
 app.use(cors({
   origin: process.env.FRONTEND_URL || "https://rozana-projects.online",
   methods: ["GET", "POST", "PUT", "DELETE"],
@@ -22,11 +19,13 @@ app.use(cors({
   credentials: true,
 }));
 
+// ROUTES
+const authRoutes = require("./routes/auth.routes");
 app.use("/users", authRoutes);
 
 // HEALTH
 app.get("/health", (req, res) => {
-  res.status(200).json({ status: "ok" });
+  res.json({ status: "ok" });
 });
 
 // START
