@@ -12,7 +12,6 @@ app.use((req, res, next) => {
 
 // 👉 IMPORT ROUTES
 const authRoutes = require("./routes/auth.routes");
-const addressRoutes = require("./routes/addressRoutes");
 
 app.use(express.json());
 
@@ -23,7 +22,6 @@ app.use(cors({
 }));
 
 app.use("/users", authRoutes);
-app.use("/", addressRoutes);
 
 // HEALTH
 app.get("/health", (req, res) => {
