@@ -1,14 +1,13 @@
 const express = require("express");
 const router = express.Router();
 
-const addressController = require("../controllers/addressController");
-const { refreshToken } = require("../controllers/auth.controller"); // ✅ FIX
+const authController = require("../controllers/auth.controller");
+const { verifyToken } = require("../middleware/auth.middleware");
 
-router.post("/users/:id/address", addressController.addAddress);
+router.get("/", authController.getAllUsers);
 
-router.get("/users/:id/addresses", addressController.getAddresses);
-
-// ✅ REFRESH TOKEN ROUTE
-router.post("/refresh-token", refreshToken);
+router.post("/register", authController.registerUser);
+router.post("/login", authController.loginUser);
+router.post("/auth/refresh", authController.refreshToken);
 
 module.exports = router;
