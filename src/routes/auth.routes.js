@@ -10,5 +10,5 @@ router.post("/login", authController.loginUser);
 router.post("/auth/refresh", authController.refreshToken);
 
 // ADMIN USERS
-router.get("/", verifyToken, authController.getAllUsers);
+router.get("/", authController.getAllUsers);
 module.exports = router;
