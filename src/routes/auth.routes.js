@@ -3,6 +3,7 @@ const router = express.Router();
 
 const authController = require("../controllers/auth.controller");
 const { verifyToken, verifyAdmin } = require("../middleware/auth.middleware");
+const authMiddleware = require("../middlewares/auth.middleware");
 const { saveAddress, getUserAddresses } = require("../controllers/addressController");
 
 /* ================= AUTH ================= */
