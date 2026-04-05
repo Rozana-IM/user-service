@@ -63,3 +63,27 @@ exports.getUserAddresses = async (req, res) => {
     res.status(500).json({ error: "Failed to fetch addresses" });
   }
 };
+
+// ================= DELETE USER ADDRESSES =================
+
+exports.deleteAddress = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const addressId = req.params.id;
+
+    const result = await db.query(
+      "DELETE FROM user_addresses WHERE id = ? AND user_id = ?",
+      [addressId, userId]
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: "Address not found" });
+    }
+
+    res.json({ success: true });
+
+  } catch (err) {
+    console.error("❌ Delete address error:", err);
+    res.status(500).json({ error: "Failed to delete address" });
+  }
+};
