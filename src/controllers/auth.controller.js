@@ -143,8 +143,13 @@ exports.refreshToken = async (req, res) => {
       });
     }
 
-    const decoded = jwt.verify(refreshToken, process.env.JWT_SECRET);
+    let decoded;
 
+try {
+  decoded = jwt.verify(refreshToken, process.env.JWT_SECRET);
+} catch {
+  return res.status(403).json({ error: "Invalid refresh token" });
+}
     const results = await db.query(
       "SELECT * FROM users WHERE id=? AND refresh_token=?",
       [decoded.id, refreshToken]
